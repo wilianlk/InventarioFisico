@@ -9,22 +9,15 @@ namespace InventarioFisico.Services
     public class OperacionConteoItemsService
     {
         private readonly OperacionConteoItemsRepository _repo;
-        private readonly InventarioService _inventarioService;
-        private readonly ConsolidacionRepository _consolidacionRepo;
 
-        public OperacionConteoItemsService(
-            OperacionConteoItemsRepository repo,
-            InventarioService inventarioService,
-            ConsolidacionRepository consolidacionRepo)
+        public OperacionConteoItemsService(OperacionConteoItemsRepository repo)
         {
             _repo = repo;
-            _inventarioService = inventarioService;
-            _consolidacionRepo = consolidacionRepo;
         }
 
-        public Task<List<OperacionConteoItem>> ObtenerPorConteoAsync(int conteoId)
+        public Task<List<OperacionConteoItem>> ObtenerPorConteoAsync(int numeroConteo)
         {
-            return _repo.ObtenerPorConteoAsync(conteoId);
+            return _repo.ObtenerPorConteoAsync(numeroConteo);
         }
 
         public Task<OperacionConteoItem> ObtenerPorIdAsync(int itemId)
@@ -41,16 +34,7 @@ namespace InventarioFisico.Services
             if (item == null)
                 throw new KeyNotFoundException("Ítem no encontrado.");
 
-            var operacion = await _inventarioService.ObtenerOperacionPorIdAsync(item.OperacionId);
-            if (operacion == null)
-                throw new InvalidOperationException("La operación no existe.");
-
-            if (string.Equals(operacion.Estado, "CERRADA", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("No se puede modificar: la operación está cerrada.");
-
-            if (await _consolidacionRepo.OperacionEstaConsolidadaAsync(item.OperacionId))
-                throw new InvalidOperationException("No se puede modificar: la operación ya fue consolidada.");
-
+            // regla: si existe el ítem, el conteo está activo en este modelo
             await _repo.ActualizarCantidadContadaAsync(itemId, cantidadContada);
         }
     }

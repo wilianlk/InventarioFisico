@@ -30,35 +30,21 @@ namespace InventarioFisico.Repositories
             {
                 var sql = @"
                     INSERT INTO operacion_conteo_items
-                    (operacion_id, grupo_id, conteo_id, codigo_item, prod, descripcion, udm,
-                     etiqueta, lote, costo, cantidad_sistema, cantidad_contada,
-                     ubicacion, bodega, cmpy)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (operacion_id,grupo_id,numero_conteo,codigo_item,prod,descripcion,udm,
+                     etiqueta,lote,costo,cantidad_sistema,cantidad_contada,
+                     ubicacion,bodega,cmpy)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ";
 
                 using var cmd = new DB2Command(sql, conn, tx);
 
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
-                cmd.Parameters.Add(new DB2Parameter());
+                for (int i = 0; i < 15; i++) cmd.Parameters.Add(new DB2Parameter());
 
                 foreach (var it in items)
                 {
                     cmd.Parameters[0].Value = it.OperacionId;
                     cmd.Parameters[1].Value = it.GrupoId;
-                    cmd.Parameters[2].Value = it.ConteoId;
+                    cmd.Parameters[2].Value = it.NumeroConteo;
                     cmd.Parameters[3].Value = it.CodigoItem;
                     cmd.Parameters[4].Value = (object?)it.Prod ?? DBNull.Value;
                     cmd.Parameters[5].Value = (object?)it.Descripcion ?? DBNull.Value;
@@ -67,7 +53,7 @@ namespace InventarioFisico.Repositories
                     cmd.Parameters[8].Value = (object?)it.Lote ?? DBNull.Value;
                     cmd.Parameters[9].Value = (object?)it.Costo ?? DBNull.Value;
                     cmd.Parameters[10].Value = (object?)it.CantidadSistema ?? DBNull.Value;
-                    cmd.Parameters[11].Value = it.CantidadContada; // nunca NULL
+                    cmd.Parameters[11].Value = it.CantidadContada;
                     cmd.Parameters[12].Value = it.Ubicacion;
                     cmd.Parameters[13].Value = (object?)it.Bodega ?? DBNull.Value;
                     cmd.Parameters[14].Value = (object?)it.Cmpy ?? DBNull.Value;
@@ -90,19 +76,18 @@ namespace InventarioFisico.Repositories
             await conn.OpenAsync();
 
             var sql = @"
-                SELECT id, operacion_id, grupo_id, conteo_id, codigo_item, prod,
-                       descripcion, udm, etiqueta, lote, costo,
-                       cantidad_sistema, cantidad_contada, ubicacion, bodega, cmpy
+                SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
+                       descripcion,udm,etiqueta,lote,costo,
+                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy
                 FROM operacion_conteo_items
-                WHERE id = ?
+                WHERE id=?
             ";
 
             using var cmd = new DB2Command(sql, conn);
             cmd.Parameters.Add(new DB2Parameter { Value = idItem });
 
             using DbDataReader r = await cmd.ExecuteReaderAsync();
-            if (await r.ReadAsync())
-                return Map(r);
+            if (await r.ReadAsync()) return Map(r);
 
             return null;
         }
@@ -115,18 +100,13 @@ namespace InventarioFisico.Repositories
             await conn.OpenAsync();
 
             var sql = @"
-                SELECT i.id, i.operacion_id, i.grupo_id, i.conteo_id, i.codigo_item, i.prod,
-                       i.descripcion, i.udm, i.etiqueta, i.lote, i.costo,
-                       i.cantidad_sistema, i.cantidad_contada, i.ubicacion, i.bodega, i.cmpy
-                FROM operacion_conteo_items i
-                WHERE i.operacion_id = ?
-                  AND i.grupo_id = ?
-                  AND EXISTS (
-                      SELECT 1
-                      FROM operacion_conteo oc
-                      WHERE oc.id = i.conteo_id
-                        AND oc.numero_conteo = ?
-                  )
+                SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
+                       descripcion,udm,etiqueta,lote,costo,
+                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy
+                FROM operacion_conteo_items
+                WHERE operacion_id=?
+                  AND grupo_id=?
+                  AND numero_conteo=?
             ";
 
             using var cmd = new DB2Command(sql, conn);
@@ -143,7 +123,7 @@ namespace InventarioFisico.Repositories
             return lista;
         }
 
-        public async Task<List<OperacionConteoItem>> ObtenerPorConteoAsync(int conteoId)
+        public async Task<List<OperacionConteoItem>> ObtenerPorConteoAsync(int numeroConteo)
         {
             var lista = new List<OperacionConteoItem>();
 
@@ -151,15 +131,15 @@ namespace InventarioFisico.Repositories
             await conn.OpenAsync();
 
             var sql = @"
-                SELECT id, operacion_id, grupo_id, conteo_id, codigo_item, prod,
-                       descripcion, udm, etiqueta, lote, costo,
-                       cantidad_sistema, cantidad_contada, ubicacion, bodega, cmpy
+                SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
+                       descripcion,udm,etiqueta,lote,costo,
+                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy
                 FROM operacion_conteo_items
-                WHERE conteo_id = ?
+                WHERE numero_conteo=?
             ";
 
             using var cmd = new DB2Command(sql, conn);
-            cmd.Parameters.Add(new DB2Parameter { Value = conteoId });
+            cmd.Parameters.Add(new DB2Parameter { Value = numeroConteo });
 
             using DbDataReader r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync())
@@ -177,8 +157,8 @@ namespace InventarioFisico.Repositories
 
             var sql = @"
                 UPDATE operacion_conteo_items
-                SET cantidad_contada = ?
-                WHERE id = ?
+                SET cantidad_contada=?
+                WHERE id=?
             ";
 
             using var cmd = new DB2Command(sql, conn);
@@ -195,7 +175,7 @@ namespace InventarioFisico.Repositories
                 Id = r.GetInt32(0),
                 OperacionId = r.GetInt32(1),
                 GrupoId = r.GetInt32(2),
-                ConteoId = r.GetInt32(3),
+                NumeroConteo = r.GetInt32(3),
                 CodigoItem = r.IsDBNull(4) ? "" : r.GetString(4),
                 Prod = r.IsDBNull(5) ? null : r.GetString(5),
                 Descripcion = r.IsDBNull(6) ? null : r.GetString(6),

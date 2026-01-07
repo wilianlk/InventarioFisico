@@ -30,15 +30,25 @@ namespace InventarioFisico.Services
 
             foreach (var grupo in grupos)
             {
+                // 🔒 REGRA CLAVE: no recrear cabecera si ya existe
+                var existente = await _conteoRepo.ObtenerPorOperacionGrupoNumeroAsync(
+                    operacionId,
+                    grupo.Id,
+                    numeroConteo
+                );
+
+                if (existente != null)
+                    continue;
+
                 var conteo = new OperacionConteo
                 {
                     OperacionId = operacionId,
                     GrupoId = grupo.Id,
                     NumeroConteo = numeroConteo,
-                    Estado = "PENDIENTE"
+                    Estado = "ABIERTO"
                 };
 
-                var conteoIdReal = await _conteoRepo.CrearAsync(conteo);
+                await _conteoRepo.CrearAsync(conteo);
 
                 var ubicaciones = await _ubicacionService.ObtenerPorGrupoAsync(grupo.Id);
                 var itemsAInsertar = new List<OperacionConteoItem>();
@@ -53,7 +63,7 @@ namespace InventarioFisico.Services
                         {
                             OperacionId = operacionId,
                             GrupoId = grupo.Id,
-                            ConteoId = conteoIdReal,
+                            NumeroConteo = numeroConteo,
                             CodigoItem = it.Item,
                             Prod = it.Prod,
                             Descripcion = it.Descripcion,

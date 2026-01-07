@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using IBM.Data.Db2;
 using InventarioFisico.Models;
@@ -26,7 +27,7 @@ namespace InventarioFisico.Services
 
             var ubicacionesGrupo = await _repo.ObtenerUbicacionesPorGrupoAsync(grupoId);
             if (ubicacionesGrupo.Exists(u => u.Trim().ToUpper() == ubicacion))
-                throw new System.InvalidOperationException(
+                throw new InvalidOperationException(
                     $"La ubicación {ubicacion} ya está asignada a este grupo."
                 );
 
@@ -41,66 +42,63 @@ namespace InventarioFisico.Services
 
         public async Task<List<string>> ObtenerRangoUbicacionesAsync(string desde, string hasta)
         {
-            return await _repo.ObtenerRangoUbicacionesAsync(desde, hasta);
+            return await _repo.ObtenerRangoUbicacionesAsync(
+                desde.Trim().ToUpper(),
+                hasta.Trim().ToUpper()
+            );
         }
 
-        public async Task<List<ItemPhystag>> ObtenerItemsPorUbicacionAsync(string ubicacion)
+        public UbicacionInterpretada InterpretarUbicacion(string bodega, string ubicacion)
         {
-            using var conn = new DB2Connection(_repo.ObtenerProveedor().Get());
-            await conn.OpenAsync();
+            if (string.IsNullOrWhiteSpace(bodega))
+                throw new InvalidOperationException("La bodega es obligatoria para interpretar la ubicación.");
 
-            const string sql = @"
-                SELECT 
-                    p.tg_cmpy,
-                    p.tg_ware,
-                    p.tg_tag,
-                    p.tg_part,
-                    p.tg_prod,
-                    p.tg_bin,
-                    p.tg_lot,
-                    p.tg_desc,
-                    p.tg_stku,
-                    p.tg_cost,
-                    p.tg_count
-                FROM phystag p
-                JOIN itemmain i 
-                      ON i.pr_cmpy = p.tg_cmpy
-                     AND i.pr_id   = p.tg_part
-                WHERE p.tg_cmpy = 'RE'
-                  AND p.tg_bin = ?
-                ORDER BY p.tg_part
-            ";
+            if (string.IsNullOrWhiteSpace(ubicacion))
+                throw new InvalidOperationException("La ubicación es obligatoria.");
 
-            using var cmd = new DB2Command(sql, conn);
-            cmd.Parameters.Add(new DB2Parameter("ubicacion", ubicacion));
+            ubicacion = ubicacion.Trim().ToUpper();
 
-            var lista = new List<ItemPhystag>();
-
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            if (bodega == "13M")
             {
-                lista.Add(new ItemPhystag
+                return new UbicacionInterpretada
                 {
-                    Cmpy = reader.GetString(0),
-                    Bodega = reader.GetString(1),
-                    Etiqueta = reader.GetString(2),
-                    Item = reader.GetString(3),
-                    Prod = reader.GetString(4),
-                    Ubicacion = reader.GetString(5),
-                    Lote = reader.IsDBNull(6) ? "" : reader.GetString(6),
-                    Descripcion = reader.GetString(7),
-                    Udm = reader.GetString(8),
-                    Costo = reader.GetDecimal(9),
-                    CantidadSistema = reader.GetDecimal(10)
-                });
+                    Bodega = bodega,
+                    RackPasillo = ubicacion.Substring(0, 2),
+                    Lado = ubicacion.Substring(2, 1),
+                    Altura = ubicacion.Substring(3, 1),
+                    Posicion = ubicacion.Substring(4, 2)
+                };
             }
 
-            return lista;
+            if (bodega == "11")
+            {
+                return new UbicacionInterpretada
+                {
+                    Bodega = bodega,
+                    RackPasillo = ubicacion.Substring(0, 1),
+                    Lado = null,
+                    Altura = ubicacion.Substring(1, 1),
+                    Posicion = ubicacion.Substring(2, 2)
+                };
+            }
+
+            throw new InvalidOperationException(
+                $"No existe nomenclatura definida para la bodega {bodega}."
+            );
         }
 
         public Task EliminarAsync(int grupoId, string ubicacion)
         {
             return _repo.EliminarAsync(grupoId, ubicacion.Trim().ToUpper());
         }
+    }
+
+    public class UbicacionInterpretada
+    {
+        public string Bodega { get; set; }
+        public string RackPasillo { get; set; }
+        public string Lado { get; set; }
+        public string Altura { get; set; }
+        public string Posicion { get; set; }
     }
 }

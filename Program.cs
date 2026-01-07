@@ -1,6 +1,7 @@
 using InventarioFisico.Infrastructure;
 using InventarioFisico.Repositories;
 using InventarioFisico.Services;
+using InventarioFisico.Services.Auth;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
 
@@ -88,6 +89,8 @@ builder.Services.AddScoped<BloqueConteoService>();
 builder.Services.AddScoped<GeneradorConteoService>();
 builder.Services.AddScoped<ValidacionCierreService>();
 builder.Services.AddScoped<OperacionConteoItemsService>();
+builder.Services.AddScoped<CerrarConteoService>();
+builder.Services.AddScoped<AuthService>();
 
 var app = builder.Build();
 

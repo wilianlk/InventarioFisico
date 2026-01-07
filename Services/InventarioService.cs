@@ -43,7 +43,7 @@ namespace InventarioFisico.Services
                 throw new InvalidOperationException("La operación no existe.");
 
             if (operacion.Estado == "CERRADA")
-                throw new InvalidOperationException("La operación ya está cerrada.");
+                return;
 
             await _repo.ActualizarEstadoAsync(id, "CERRADA");
         }
@@ -58,6 +58,12 @@ namespace InventarioFisico.Services
                 throw new InvalidOperationException("Solo pueden eliminarse operaciones en estado EN_PREPARACION.");
 
             await _repo.EliminarOperacionAsync(id);
+        }
+
+        public async Task<string> ObtenerEstadoOperacionAsync(int operacionId)
+        {
+            var operacion = await _repo.ObtenerOperacionPorIdAsync(operacionId);
+            return operacion?.Estado;
         }
     }
 }
