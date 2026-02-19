@@ -127,6 +127,22 @@ namespace InventarioFisico.Services
             );
         }
 
+        public async Task<List<ItemPhystag>> BuscarPorItemAsync(
+            string? bodega,
+            string? codigoItem,
+            string? lote = null)
+        {
+            var b = NormalizarBodega(bodega);
+            var item = N(codigoItem);
+            
+            if (string.IsNullOrWhiteSpace(item))
+                throw new InvalidOperationException("Código de item es obligatorio.");
+
+            var l = N(lote);
+            
+            return await _repo.ObtenerItemsPorCodigoItemAsync(b, item, string.IsNullOrWhiteSpace(l) ? null : l);
+        }
+
         public async Task<List<object>> ObtenerBodegasAsync()
         {
             var data = await _repo.ObtenerBodegasAsync();

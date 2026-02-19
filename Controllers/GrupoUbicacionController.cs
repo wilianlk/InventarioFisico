@@ -62,6 +62,32 @@ namespace InventarioFisico.Controllers
             });
         }
 
+        [HttpGet("buscar-por-item")]
+        public async Task<IActionResult> BuscarPorItem(
+            [FromQuery][Required] string bodega,
+            [FromQuery][Required] string item,
+            [FromQuery] string? lote)
+        {
+            try
+            {
+                var resultado = await _service.BuscarPorItemAsync(bodega, item, lote);
+
+                return Ok(new
+                {
+                    total = resultado.Count,
+                    data = resultado,
+                    mensaje = resultado.Count == 0 ? 
+                        $"No se encontró el item '{item}' en la bodega '{bodega}'" + 
+                        (string.IsNullOrWhiteSpace(lote) ? "" : $" con lote '{lote}'") : 
+                        null
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { mensaje = ex.Message });
+            }
+        }
+
         [HttpGet("bodegas")]
         public async Task<IActionResult> ObtenerBodegas()
         {
