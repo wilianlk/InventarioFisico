@@ -280,5 +280,20 @@ namespace InventarioFisico.Repositories
             cmd.Parameters.Add(new DB2Parameter { Value = conteoId });
             await cmd.ExecuteNonQueryAsync();
         }
+
+        public async Task EliminarPorOperacionAsync(int operacionId)
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                DELETE FROM operacion_conteo
+                WHERE operacion_id = ?
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter { Value = operacionId });
+            await cmd.ExecuteNonQueryAsync();
+        }
     }
 }

@@ -32,13 +32,13 @@ namespace InventarioFisico.Repositories
                     INSERT INTO operacion_conteo_items
                     (operacion_id,grupo_id,numero_conteo,codigo_item,prod,descripcion,udm,
                      etiqueta,lote,costo,cantidad_sistema,cantidad_contada,
-                     ubicacion,bodega,cmpy)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                     ubicacion,bodega,cmpy,no_encontrado)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ";
 
                 using var cmd = new DB2Command(sql, conn, tx);
 
-                for (int i = 0; i < 15; i++) cmd.Parameters.Add(new DB2Parameter());
+                for (int i = 0; i < 16; i++) cmd.Parameters.Add(new DB2Parameter());
 
                 foreach (var it in items)
                 {
@@ -57,6 +57,7 @@ namespace InventarioFisico.Repositories
                     cmd.Parameters[12].Value = it.Ubicacion;
                     cmd.Parameters[13].Value = (object?)it.Bodega ?? DBNull.Value;
                     cmd.Parameters[14].Value = (object?)it.Cmpy ?? DBNull.Value;
+                    cmd.Parameters[15].Value = it.NoEncontrado ? 1 : 0;
 
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -78,7 +79,8 @@ namespace InventarioFisico.Repositories
             var sql = @"
                 SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
                        descripcion,udm,etiqueta,lote,costo,
-                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy
+                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
+                       no_encontrado
                 FROM operacion_conteo_items
                 WHERE id=?
             ";
@@ -102,7 +104,8 @@ namespace InventarioFisico.Repositories
             var sql = @"
                 SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
                        descripcion,udm,etiqueta,lote,costo,
-                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy
+                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
+                       no_encontrado
                 FROM operacion_conteo_items
                 WHERE operacion_id=?
                   AND grupo_id=?
@@ -123,7 +126,7 @@ namespace InventarioFisico.Repositories
             return lista;
         }
 
-        public async Task<List<OperacionConteoItem>> ObtenerPorConteoAsync(int numeroConteo)
+        public async Task<List<OperacionConteoItem>> ObtenerPorConteoAsync(int conteoId)
         {
             var lista = new List<OperacionConteoItem>();
 
@@ -133,13 +136,14 @@ namespace InventarioFisico.Repositories
             var sql = @"
                 SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
                        descripcion,udm,etiqueta,lote,costo,
-                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy
+                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
+                       no_encontrado
                 FROM operacion_conteo_items
-                WHERE numero_conteo=?
+                WHERE oc_id=?
             ";
 
             using var cmd = new DB2Command(sql, conn);
-            cmd.Parameters.Add(new DB2Parameter { Value = numeroConteo });
+            cmd.Parameters.Add(new DB2Parameter { Value = conteoId });
 
             using DbDataReader r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync())
@@ -148,6 +152,79 @@ namespace InventarioFisico.Repositories
             }
 
             return lista;
+        }
+
+        public async Task<List<OperacionConteoItem>> ObtenerNoEncontradosPorConteoAsync(int conteoId)
+        {
+            var lista = new List<OperacionConteoItem>();
+
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
+                       descripcion,udm,etiqueta,lote,costo,
+                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
+                       no_encontrado
+                FROM operacion_conteo_items
+                WHERE oc_id=?
+                  AND no_encontrado=1
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter { Value = conteoId });
+
+            using DbDataReader r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                lista.Add(Map(r));
+            }
+
+            return lista;
+        }
+
+        public async Task<List<OperacionConteoItem>> ObtenerPorOperacionAsync(int operacionId)
+        {
+            var lista = new List<OperacionConteoItem>();
+
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
+                       descripcion,udm,etiqueta,lote,costo,
+                       cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
+                       no_encontrado
+                FROM operacion_conteo_items
+                WHERE operacion_id=?
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter { Value = operacionId });
+
+            using DbDataReader r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                lista.Add(Map(r));
+            }
+
+            return lista;
+        }
+
+        public async Task EliminarPorOperacionAsync(int operacionId)
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                DELETE FROM operacion_conteo_items
+                WHERE operacion_id=?
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter { Value = operacionId });
+
+            await cmd.ExecuteNonQueryAsync();
         }
 
         public async Task ActualizarCantidadContadaAsync(int idItem, int cantidadContada)
@@ -163,6 +240,24 @@ namespace InventarioFisico.Repositories
 
             using var cmd = new DB2Command(sql, conn);
             cmd.Parameters.Add(new DB2Parameter { Value = cantidadContada });
+            cmd.Parameters.Add(new DB2Parameter { Value = idItem });
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task ActualizarNoEncontradoAsync(int idItem, bool noEncontrado)
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                UPDATE operacion_conteo_items
+                SET no_encontrado=?
+                WHERE id=?
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter { Value = noEncontrado ? 1 : 0 });
             cmd.Parameters.Add(new DB2Parameter { Value = idItem });
 
             await cmd.ExecuteNonQueryAsync();
@@ -187,7 +282,8 @@ namespace InventarioFisico.Repositories
                 CantidadContada = r.IsDBNull(12) ? 0 : r.GetInt32(12),
                 Ubicacion = r.IsDBNull(13) ? "" : r.GetString(13),
                 Bodega = r.IsDBNull(14) ? null : r.GetString(14),
-                Cmpy = r.IsDBNull(15) ? null : r.GetString(15)
+                Cmpy = r.IsDBNull(15) ? null : r.GetString(15),
+                NoEncontrado = !r.IsDBNull(16) && r.GetInt16(16) == 1
             };
         }
     }

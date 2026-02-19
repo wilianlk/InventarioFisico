@@ -22,8 +22,7 @@ namespace InventarioFisico.Repositories
             using var conn = new DB2Connection(_provider.Get());
             await conn.OpenAsync();
 
-            var sql = @"SELECT id, bodega, fecha, observaciones, estado, 
-                               usuario_creacion, fecha_creacion, numero_conteo
+            var sql = @"SELECT id,bodega,fecha,observaciones,estado,usuario_creacion,fecha_creacion,numero_conteo
                         FROM operaciones_inventario";
 
             using var cmd = new DB2Command(sql, conn);
@@ -52,8 +51,7 @@ namespace InventarioFisico.Repositories
             using var conn = new DB2Connection(_provider.Get());
             await conn.OpenAsync();
 
-            var sql = @"SELECT id, bodega, fecha, observaciones, estado, 
-                               usuario_creacion, fecha_creacion, numero_conteo
+            var sql = @"SELECT id,bodega,fecha,observaciones,estado,usuario_creacion,fecha_creacion,numero_conteo
                         FROM operaciones_inventario
                         WHERE id = ?";
 
@@ -85,11 +83,9 @@ namespace InventarioFisico.Repositories
             await conn.OpenAsync();
 
             var sql = @"
-                INSERT INTO operaciones_inventario 
-                    (bodega, fecha, observaciones, estado, usuario_creacion, fecha_creacion, numero_conteo)
-                VALUES 
-                    (?, ?, ?, ?, ?, ?, ?);
-
+                INSERT INTO operaciones_inventario
+                (bodega,fecha,observaciones,estado,usuario_creacion,fecha_creacion,numero_conteo)
+                VALUES (?,?,?,?,?,?,?);
                 SELECT dbinfo('sqlca.sqlerrd1') FROM systables WHERE tabid = 1;
             ";
 
@@ -124,11 +120,46 @@ namespace InventarioFisico.Repositories
             using var conn = new DB2Connection(_provider.Get());
             await conn.OpenAsync();
 
-            var sql = "DELETE FROM operaciones_inventario WHERE id = ?";
-            using var cmd = new DB2Command(sql, conn);
-            cmd.Parameters.Add(new DB2Parameter("id", id));
+            using var tx = conn.BeginTransaction();
 
-            await cmd.ExecuteNonQueryAsync();
+            try
+            {
+                var sqlDetalle = @"
+                    DELETE FROM consolidacion_detalle
+                    WHERE cabecera_id IN (
+                        SELECT id FROM consolidacion_cabecera WHERE operacion_id = ?
+                    )";
+
+                var sqlCabecera = "DELETE FROM consolidacion_cabecera WHERE operacion_id = ?";
+                var sqlItems = "DELETE FROM operacion_conteo_items WHERE operacion_id = ?";
+                var sqlConteo = "DELETE FROM operacion_conteo WHERE operacion_id = ?";
+                var sqlGrupos = "DELETE FROM operacion_grupos WHERE operacion_id = ?";
+                var sqlBloques = "DELETE FROM bloque_conteo WHERE bc_operacion_id = ?";
+                var sqlOperacion = "DELETE FROM operaciones_inventario WHERE id = ?";
+
+                foreach (var sql in new[]
+                {
+                    sqlDetalle,
+                    sqlCabecera,
+                    sqlItems,
+                    sqlConteo,
+                    sqlGrupos,
+                    sqlBloques,
+                    sqlOperacion
+                })
+                {
+                    using var cmd = new DB2Command(sql, conn, tx);
+                    cmd.Parameters.Add(new DB2Parameter("id", id));
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
         }
 
         public async Task<bool> ExisteOperacionAsync(string bodega, DateTime fecha)

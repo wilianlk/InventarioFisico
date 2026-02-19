@@ -17,27 +17,25 @@ namespace InventarioFisico.Services
             _repo = repo;
         }
 
-        public async Task<List<dynamic>> ObtenerConteosFinalizadosAsync()
+        public Task<List<dynamic>> ObtenerConteosFinalizadosAsync()
         {
-            return await _repo.ObtenerConteosFinalizadosAsync();
+            return _repo.ObtenerConteosFinalizadosAsync();
         }
 
-        public async Task<ConsolidacionCierre> FinalizarOperacionesAsync(List<int> operacionIds)
+        public async Task<string> CerrarConsolidacionAsync(int operacionId)
         {
-            foreach (var operacionId in operacionIds)
-            {
-                var puede = await _repo.ConteosCerradosAsync(operacionId);
-                if (!puede)
-                    throw new InvalidOperationException($"La operación {operacionId} tiene conteos abiertos.");
+            var yaFinalizada = await _repo.ConsolidacionFinalizadaAsync(operacionId);
+            if (yaFinalizada)
+                return "La operación ya se encuentra en estado FINALIZADA";
 
-                await _repo.BloquearOperacionAsync(operacionId);
-            }
+            var cerrados = await _repo.ConteosCerradosAsync(operacionId);
+            if (!cerrados)
+                throw new InvalidOperationException("Existen conteos abiertos.");
 
-            return new ConsolidacionCierre
-            {
-                OperacionIds = operacionIds,
-                OperacionesFinalizadas = new List<int>(operacionIds)
-            };
+            await _repo.CalcularCantidadFinalAsync(operacionId);
+            await _repo.MarcarConsolidacionFinalizadaAsync(operacionId);
+
+            return "Operación finalizada correctamente";
         }
 
         public async Task<string> GenerarArchivoDI81Async(int operacionId)
@@ -68,9 +66,9 @@ namespace InventarioFisico.Services
             return sb.ToString();
         }
 
-        public async Task<bool> ConsolidacionFinalizadaAsync(int operacionId)
+        public Task<bool> ConsolidacionFinalizadaAsync(int operacionId)
         {
-            return await _repo.ConsolidacionFinalizadaAsync(operacionId);
+            return _repo.ConsolidacionFinalizadaAsync(operacionId);
         }
     }
 }

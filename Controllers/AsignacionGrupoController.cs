@@ -15,13 +15,16 @@ namespace InventarioFisico.Controllers
     public class AsignacionGrupoController : ControllerBase
     {
         private readonly GrupoConteoService _grupoService;
+        private readonly InventarioService _inventarioService;
         private readonly ILogger<AsignacionGrupoController> _logger;
 
         public AsignacionGrupoController(
             GrupoConteoService grupoService,
+            InventarioService inventarioService,
             ILogger<AsignacionGrupoController> logger)
         {
             _grupoService = grupoService;
+            _inventarioService = inventarioService;
             _logger = logger;
         }
 

@@ -15,9 +15,14 @@ namespace InventarioFisico.Services
             _repo = repo;
         }
 
-        public Task<List<OperacionConteoItem>> ObtenerPorConteoAsync(int numeroConteo)
+        public Task<List<OperacionConteoItem>> ObtenerPorConteoAsync(int conteoId)
         {
-            return _repo.ObtenerPorConteoAsync(numeroConteo);
+            return _repo.ObtenerPorConteoAsync(conteoId);
+        }
+
+        public Task<List<OperacionConteoItem>> ObtenerNoEncontradosPorConteoAsync(int conteoId)
+        {
+            return _repo.ObtenerNoEncontradosPorConteoAsync(conteoId);
         }
 
         public Task<OperacionConteoItem> ObtenerPorIdAsync(int itemId)
@@ -34,8 +39,16 @@ namespace InventarioFisico.Services
             if (item == null)
                 throw new KeyNotFoundException("Ítem no encontrado.");
 
-            // regla: si existe el ítem, el conteo está activo en este modelo
             await _repo.ActualizarCantidadContadaAsync(itemId, cantidadContada);
+        }
+
+        public async Task ActualizarNoEncontradoAsync(int itemId, bool noEncontrado)
+        {
+            var item = await _repo.ObtenerPorIdAsync(itemId);
+            if (item == null)
+                throw new KeyNotFoundException("Ítem no encontrado.");
+
+            await _repo.ActualizarNoEncontradoAsync(itemId, noEncontrado);
         }
     }
 }

@@ -11,13 +11,16 @@ namespace InventarioFisico.Controllers
     public class GrupoPersonaController : ControllerBase
     {
         private readonly GrupoPersonaService _service;
+        private readonly GrupoConteoService _grupoService;
         private readonly ILogger<GrupoPersonaController> _logger;
 
         public GrupoPersonaController(
             GrupoPersonaService service,
+            GrupoConteoService grupoService,
             ILogger<GrupoPersonaController> logger)
         {
             _service = service;
+            _grupoService = grupoService;
             _logger = logger;
         }
 
@@ -26,6 +29,13 @@ namespace InventarioFisico.Controllers
         {
             try
             {
+                var grupo = await _grupoService.ObtenerPorIdAsync(grupoId);
+                if (grupo == null)
+                    return NotFound(new { mensaje = "Grupo no encontrado." });
+
+                if (grupo.Estado != "ACTIVO")
+                    return Conflict(new { mensaje = "No se pueden modificar personas: el grupo est\u00e1 INACTIVO." });
+
                 await _service.AgregarPersonaAsync(grupoId, usuarioId, usuarioNombre);
                 return Ok(new { mensaje = "Usuario agregado correctamente al grupo" });
             }
@@ -41,6 +51,13 @@ namespace InventarioFisico.Controllers
         {
             try
             {
+                var grupo = await _grupoService.ObtenerPorIdAsync(grupoId);
+                if (grupo == null)
+                    return NotFound(new { mensaje = "Grupo no encontrado." });
+
+                if (grupo.Estado != "ACTIVO")
+                    return Conflict(new { mensaje = "No se pueden modificar personas: el grupo est\u00e1 INACTIVO." });
+
                 await _service.EliminarPersonaAsync(grupoId, usuarioId);
                 return Ok(new { mensaje = "Usuario eliminado correctamente del grupo" });
             }

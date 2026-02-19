@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using InventarioFisico.Services;
+using InventarioFisico.Models;
 
 namespace InventarioFisico.Controllers
 {
@@ -12,112 +12,125 @@ namespace InventarioFisico.Controllers
     public class GrupoUbicacionController : ControllerBase
     {
         private readonly GrupoUbicacionService _service;
-        private readonly ILogger<GrupoUbicacionController> _logger;
+        private readonly GrupoConteoService _grupoService;
 
-        public GrupoUbicacionController(
-            GrupoUbicacionService service,
-            ILogger<GrupoUbicacionController> logger)
+        public GrupoUbicacionController(GrupoUbicacionService service, GrupoConteoService grupoService)
         {
             _service = service;
-            _logger = logger;
+            _grupoService = grupoService;
         }
 
-        [HttpGet("{grupoId:int}")]
-        public async Task<IActionResult> Obtener(int grupoId)
+        public class GrupoUbicacionAgregarDto
         {
-            try
-            {
-                var ubicaciones = await _service.ObtenerPorGrupoAsync(grupoId);
-
-                var ubicacionesConItems = new List<object>();
-
-                foreach (var ubicacion in ubicaciones)
-                {
-                    var items = await _service.ObtenerItemsPorUbicacionAsync(ubicacion.Ubicacion);
-                    ubicacionesConItems.Add(new { ubicacion, items });
-                }
-
-                return Ok(ubicacionesConItems);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al obtener ubicaciones del grupo");
-                return StatusCode(500, ex.Message);
-            }
+            [Required] public int GrupoId { get; set; }
+            [Required] public string Bodega { get; set; } = "";
+            [Required] public List<GrupoUbicacionItemDto> Ubicaciones { get; set; } = new();
         }
 
-        [HttpGet("rango")]
-        public async Task<IActionResult> ObtenerRango([FromQuery] string desde, [FromQuery] string hasta)
+        [HttpGet]
+        public async Task<IActionResult> Obtener([FromQuery] int? grupoId)
         {
-            try
-            {
-                var ubicaciones = await _service.ObtenerRangoUbicacionesAsync(desde, hasta);
+            var resultado = await _service.ObtenerAsync(grupoId);
 
-                if (ubicaciones.Count == 0)
-                {
-                    return BadRequest(new { mensaje = "La ubicación no existe en inventario." });
-                }
-
-                return Ok(ubicaciones);
-            }
-            catch (Exception ex)
+            return Ok(new
             {
-                _logger.LogError(ex, "Error al obtener ubicaciones en el rango");
-                return StatusCode(500, ex.Message);
-            }
+                total = resultado.Count,
+                data = resultado
+            });
         }
 
-        [HttpGet("items")]
-        public async Task<IActionResult> ObtenerItemsPorUbicacion([FromQuery] string ubicacion)
+        [HttpGet("previsualizar")]
+        public async Task<IActionResult> Previsualizar(
+            [FromQuery][Required] string bodega,
+            [FromQuery] string? rack,
+            [FromQuery] string? lado,
+            [FromQuery] string? altura,
+            [FromQuery] string? ubicacion)
         {
-            try
-            {
-                var items = await _service.ObtenerItemsPorUbicacionAsync(ubicacion);
+            var resultado = await _service.PrevisualizarAsync(
+                bodega,
+                rack,
+                lado,
+                altura,
+                ubicacion
+            );
 
-                if (items == null || items.Count == 0)
-                    return BadRequest(new { mensaje = "La ubicación no existe en inventario." });
-
-                return Ok(items);
-            }
-            catch (Exception ex)
+            return Ok(new
             {
-                _logger.LogError(ex, "Error al obtener ítems de la ubicación");
-                return StatusCode(500, ex.Message);
-            }
+                total = resultado.Count,
+                data = resultado
+            });
+        }
+
+        [HttpGet("bodegas")]
+        public async Task<IActionResult> ObtenerBodegas()
+        {
+            var data = await _service.ObtenerBodegasAsync();
+
+            return Ok(new
+            {
+                total = data.Count,
+                data
+            });
         }
 
         [HttpPost("agregar")]
-        public async Task<IActionResult> Agregar(int grupoId, string ubicacion)
+        public async Task<IActionResult> Agregar([FromBody] GrupoUbicacionAgregarDto req)
         {
-            try
+            var grupo = await _grupoService.ObtenerPorIdAsync(req.GrupoId);
+            if (grupo == null)
+                return NotFound(new { mensaje = "Grupo no encontrado." });
+
+            if (grupo.Estado != "ACTIVO")
+                return Conflict(new { mensaje = "No se pueden modificar ubicaciones: el grupo est\u00e1 INACTIVO." });
+
+            var lista = new List<GrupoUbicacion>();
+
+            foreach (var u in req.Ubicaciones)
             {
-                await _service.AgregarAsync(grupoId, ubicacion);
-                return Ok(new { mensaje = "Ubicación agregada correctamente" });
+                lista.Add(new GrupoUbicacion
+                {
+                    GrupoId = req.GrupoId,
+                    Bodega = req.Bodega,
+                    Ubicaciones = u.Ubicacion,
+                    Rack = u.Rack,
+                    Lado = u.Lado,
+                    Altura = u.Altura,
+                    Ubicacion = u.Posicion
+                });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { mensaje = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al agregar ubicación al grupo");
-                return StatusCode(500, ex.Message);
-            }
+
+            await _service.AgregarAsync(req.GrupoId, req.Bodega, lista);
+
+            return Ok(new { mensaje = "Ubicaciones agregadas correctamente." });
         }
 
         [HttpDelete("eliminar")]
-        public async Task<IActionResult> Eliminar(int grupoId, string ubicacion)
+        public async Task<IActionResult> Eliminar(
+            [FromQuery] int grupoId,
+            [FromQuery] string bodega,
+            [FromQuery] string? rack,
+            [FromQuery] string? lado,
+            [FromQuery] string? altura,
+            [FromQuery] string? ubicacion)
         {
-            try
-            {
-                await _service.EliminarAsync(grupoId, ubicacion);
-                return Ok(new { mensaje = "Ubicación eliminada correctamente" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al eliminar ubicación del grupo");
-                return StatusCode(500, ex.Message);
-            }
+            var grupo = await _grupoService.ObtenerPorIdAsync(grupoId);
+            if (grupo == null)
+                return NotFound(new { mensaje = "Grupo no encontrado." });
+
+            if (grupo.Estado != "ACTIVO")
+                return Conflict(new { mensaje = "No se pueden modificar ubicaciones: el grupo est\u00e1 INACTIVO." });
+
+            await _service.EliminarAsync(
+                grupoId,
+                bodega,
+                rack,
+                lado,
+                altura,
+                ubicacion
+            );
+
+            return Ok(new { mensaje = "Filtro eliminado correctamente." });
         }
     }
 }

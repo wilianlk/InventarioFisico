@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using InventarioFisico.Models;
 using InventarioFisico.Repositories;
@@ -9,10 +10,26 @@ namespace InventarioFisico.Services
     public class InventarioService
     {
         private readonly InventarioRepository _repo;
+        private readonly OperacionConteoRepository _conteoRepo;
+        private readonly OperacionConteoItemsRepository _itemsRepo;
+        private readonly GrupoPersonaService _personaService;
+        private readonly GrupoUbicacionService _ubicacionService;
+        private readonly GrupoConteoService _grupoService;
 
-        public InventarioService(InventarioRepository repo)
+        public InventarioService(
+            InventarioRepository repo,
+            OperacionConteoRepository conteoRepo,
+            OperacionConteoItemsRepository itemsRepo,
+            GrupoPersonaService personaService,
+            GrupoUbicacionService ubicacionService,
+            GrupoConteoService grupoService)
         {
             _repo = repo;
+            _conteoRepo = conteoRepo;
+            _itemsRepo = itemsRepo;
+            _personaService = personaService;
+            _ubicacionService = ubicacionService;
+            _grupoService = grupoService;
         }
 
         public async Task<List<InventarioOperacion>> ObtenerOperacionesAsync()
@@ -25,10 +42,38 @@ namespace InventarioFisico.Services
             return await _repo.ObtenerOperacionPorIdAsync(id);
         }
 
-        public async Task<int> CrearOperacionAsync(InventarioOperacion operacion)
+        public async Task ValidarCreacionAsync(InventarioOperacion operacion)
         {
             if (operacion.GruposIds == null || operacion.GruposIds.Count == 0)
                 throw new InvalidOperationException("Debe asignar al menos un grupo para crear la operación.");
+
+            var gruposIncompletos = new List<string>();
+
+            foreach (var grupoId in operacion.GruposIds.Distinct())
+            {
+                var personas = await _personaService.ObtenerPersonasAsync(grupoId);
+                var ubicaciones = await _ubicacionService.ObtenerAsync(grupoId);
+
+                if (!personas.Any() || !ubicaciones.Any())
+                {
+                    var grupo = await _grupoService.ObtenerPorIdAsync(grupoId);
+                    if (grupo != null)
+                        gruposIncompletos.Add(grupo.Nombre);
+                }
+            }
+
+            if (gruposIncompletos.Any())
+            {
+                throw new InvalidOperationException(
+                    "Antes de crear esta operación, completa personas y ubicaciones en: " +
+                    string.Join(", ", gruposIncompletos)
+                );
+            }
+        }
+
+        public async Task<int> CrearOperacionAsync(InventarioOperacion operacion)
+        {
+            await ValidarCreacionAsync(operacion);
 
             operacion.FechaCreacion = DateTime.Now;
             operacion.Estado = "EN_PREPARACION";

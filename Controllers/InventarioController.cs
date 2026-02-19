@@ -3,9 +3,10 @@ using Microsoft.Extensions.Logging;
 using InventarioFisico.Services;
 using InventarioFisico.Repositories;
 using InventarioFisico.Models;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Linq;
+using System;
 
 namespace InventarioFisico.Controllers
 {
@@ -15,38 +16,32 @@ namespace InventarioFisico.Controllers
     {
         private readonly InventarioService _inventarioService;
         private readonly GrupoConteoService _grupoService;
-        private readonly GrupoPersonaService _personaService;
         private readonly BloqueConteoService _bloqueService;
         private readonly GeneradorConteoService _generadorConteoService;
         private readonly ValidacionCierreService _validacionCierreService;
         private readonly OperacionConteoRepository _conteoRepo;
         private readonly OperacionConteoItemsRepository _itemsRepo;
-        private readonly GrupoUbicacionRepository _grupoUbicacionRepo;
         private readonly CerrarConteoService _cerrarConteoService;
         private readonly ILogger<InventarioController> _logger;
 
         public InventarioController(
             InventarioService inventarioService,
             GrupoConteoService grupoService,
-            GrupoPersonaService personaService,
             BloqueConteoService bloqueService,
             GeneradorConteoService generadorConteoService,
             ValidacionCierreService validacionCierreService,
             OperacionConteoRepository conteoRepo,
             OperacionConteoItemsRepository itemsRepo,
-            GrupoUbicacionRepository grupoUbicacionRepo,
             CerrarConteoService cerrarConteoService,
             ILogger<InventarioController> logger)
         {
             _inventarioService = inventarioService;
             _grupoService = grupoService;
-            _personaService = personaService;
             _bloqueService = bloqueService;
             _generadorConteoService = generadorConteoService;
             _validacionCierreService = validacionCierreService;
             _conteoRepo = conteoRepo;
             _itemsRepo = itemsRepo;
-            _grupoUbicacionRepo = grupoUbicacionRepo;
             _cerrarConteoService = cerrarConteoService;
             _logger = logger;
         }
@@ -58,7 +53,7 @@ namespace InventarioFisico.Controllers
             return Ok(operaciones);
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{id:int}")]
         public async Task<IActionResult> ObtenerOperacionPorId(int id)
         {
             var operacion = await _inventarioService.ObtenerOperacionPorIdAsync(id);
@@ -71,55 +66,49 @@ namespace InventarioFisico.Controllers
         [HttpPost("crear")]
         public async Task<IActionResult> CrearOperacion([FromBody] InventarioOperacion operacion)
         {
-            if (operacion.GruposIds != null && operacion.GruposIds.Any())
+            try
             {
-                var gruposIncompletos = new List<string>();
+                var operacionId = await _inventarioService.CrearOperacionAsync(operacion);
 
-                foreach (var grupoId in operacion.GruposIds.Distinct())
+                if (operacion.GruposIds != null)
                 {
-                    var personas = await _personaService.ObtenerPersonasAsync(grupoId);
-                    var ubicaciones = await _grupoUbicacionRepo.ObtenerUbicacionesPorGrupoAsync(grupoId);
-
-                    if (!personas.Any() || !ubicaciones.Any())
-                    {
-                        var grupo = await _grupoService.ObtenerPorIdAsync(grupoId);
-                        if (grupo != null)
-                            gruposIncompletos.Add(grupo.Nombre);
-                    }
+                    foreach (var grupoId in operacion.GruposIds)
+                        await _grupoService.AsociarOperacionGrupoAsync(operacionId, grupoId);
                 }
 
-                if (gruposIncompletos.Any())
-                {
-                    return BadRequest(new
-                    {
-                        mensaje = "Antes de crear esta operación, completa personas y ubicaciones en los siguientes grupos:",
-                        detalle = gruposIncompletos
-                    });
-                }
+                await _generadorConteoService.GenerarConteosInicialesAsync(
+                    operacionId,
+                    operacion.NumeroConteo
+                );
+
+                return Ok(new { mensaje = "Operación creada correctamente.", id = operacionId });
             }
-
-            var operacionId = await _inventarioService.CrearOperacionAsync(operacion);
-
-            if (operacion.GruposIds != null)
+            catch (InvalidOperationException ex)
             {
-                foreach (var grupoId in operacion.GruposIds)
-                    await _grupoService.AsociarOperacionGrupoAsync(operacionId, grupoId);
+                return BadRequest(new { mensaje = ex.Message });
             }
-
-            await _generadorConteoService.GenerarConteosInicialesAsync(
-                operacionId,
-                operacion.NumeroConteo
-            );
-
-            return Ok(new { mensaje = "Operación creada correctamente.", id = operacionId });
         }
 
-        [HttpPut("cerrar/{id}")]
+        [HttpPut("cerrar/{id:int}")]
         public async Task<IActionResult> CerrarOperacion(int id)
         {
             await _validacionCierreService.ValidarAsync(id);
             await _inventarioService.CerrarOperacionAsync(id);
             return Ok(new { mensaje = "Operación cerrada exitosamente." });
+        }
+
+        [HttpDelete("eliminar/{id:int}")]
+        public async Task<IActionResult> EliminarOperacion(int id)
+        {
+            try
+            {
+                await _inventarioService.EliminarOperacionAsync(id);
+                return Ok(new { mensaje = "Operación eliminada correctamente." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { mensaje = ex.Message });
+            }
         }
 
         [HttpGet("conteo/actual")]
@@ -198,8 +187,27 @@ namespace InventarioFisico.Controllers
                 return BadRequest(new { mensaje = "El conteo ya está cerrado." });
 
             await _cerrarConteoService.CerrarConteoAsync(conteoId);
-
             return Ok(new { mensaje = "Conteo cerrado correctamente." });
+        }
+
+        [HttpGet("avance/{operacionId:int}")]
+        public async Task<IActionResult> ObtenerAvance(int operacionId)
+        {
+            var items = await _itemsRepo.ObtenerPorOperacionAsync(operacionId);
+
+            if (items == null || !items.Any())
+                return NotFound(new { mensaje = "No hay ítems para esta operación." });
+
+            var total = items.Count;
+            var contados = items.Count(x => x.CantidadContada > 0);
+
+            return Ok(new
+            {
+                operacionId,
+                totalItems = total,
+                itemsContados = contados,
+                porcentaje = total == 0 ? 0 : (contados * 100) / total
+            });
         }
     }
 }

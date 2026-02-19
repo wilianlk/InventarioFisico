@@ -1,4 +1,7 @@
-﻿using IBM.Data.Db2;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using IBM.Data.Db2;
 using InventarioFisico.Infrastructure;
 using InventarioFisico.Models;
 
@@ -18,7 +21,7 @@ namespace InventarioFisico.Repositories
             using var conn = new DB2Connection(_provider.Get());
             await conn.OpenAsync();
 
-            var sql = @"INSERT INTO bloque_conteo 
+            var sql = @"INSERT INTO bloque_conteo
                         (bc_operacion_id, bc_grupo_id, bc_ubicacion_inicio, bc_ubicacion_fin, bc_pasillo,
                          bc_lado, bc_altura_inicio, bc_altura_fin, bc_posicion_inicio, bc_posicion_fin)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -37,7 +40,11 @@ namespace InventarioFisico.Repositories
 
             await cmd.ExecuteNonQueryAsync();
 
-            var idCmd = new DB2Command("SELECT DBINFO('sqlca.sqlerrd1') FROM systables WHERE tabname = 'bloque_conteo' FETCH FIRST 1 ROWS ONLY", conn);
+            using var idCmd = new DB2Command(
+                "SELECT DBINFO('sqlca.sqlerrd1') FROM systables WHERE tabname='bloque_conteo' FETCH FIRST 1 ROWS ONLY",
+                conn
+            );
+
             var result = await idCmd.ExecuteScalarAsync();
             return Convert.ToInt32(result);
         }
@@ -123,6 +130,18 @@ namespace InventarioFisico.Repositories
             using var cmd = new DB2Command(sql, conn);
             cmd.Parameters.Add(new DB2Parameter("", grupoId.HasValue ? grupoId.Value : (object)DBNull.Value));
             cmd.Parameters.Add(new DB2Parameter("", bloqueId));
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task EliminarPorOperacionAsync(int operacionId)
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = "DELETE FROM bloque_conteo WHERE bc_operacion_id = ?";
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter("", operacionId));
 
             await cmd.ExecuteNonQueryAsync();
         }

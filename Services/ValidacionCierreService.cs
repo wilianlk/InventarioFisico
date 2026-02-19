@@ -28,14 +28,27 @@ namespace InventarioFisico.Services
             var grupos = await _grupoService.ObtenerPorOperacionAsync(operacionId);
             var conteos = await _conteoRepo.ObtenerPorOperacionAsync(operacionId);
 
-            if (conteos.Count == 0)
+            if (conteos == null || conteos.Count == 0)
                 throw new System.InvalidOperationException(
                     "No se puede cerrar la operación: no existen conteos generados."
                 );
 
-            foreach (var grupo in grupos)
+            if (conteos.Any(c => c.Estado != "CERRADO"))
+                throw new System.InvalidOperationException(
+                    "No se puede cerrar la operación: existen conteos abiertos."
+                );
+
+            /*foreach (var grupo in grupos)
             {
-                var ubicaciones = await _ubicacionRepo.ObtenerUbicacionesPorGrupoAsync(grupo.Id);
+                var ubicaciones = await _ubicacionRepo.ObtenerAsync(
+                    grupo.Id,
+                    "",
+                    null,
+                    null,
+                    null,
+                    null
+                );
+
                 if (ubicaciones == null || ubicaciones.Count == 0)
                     throw new System.InvalidOperationException(
                         $"No se puede cerrar la operación: el grupo '{grupo.Nombre}' no tiene ubicaciones asignadas."
@@ -55,7 +68,7 @@ namespace InventarioFisico.Services
                             $"No se puede cerrar la operación: el grupo '{grupo.Nombre}' tiene conteos sin ítems del sistema."
                         );
                 }
-            }
+            }*/
         }
     }
 }

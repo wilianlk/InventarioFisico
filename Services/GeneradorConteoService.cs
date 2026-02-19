@@ -1,7 +1,8 @@
-﻿using InventarioFisico.Models;
-using InventarioFisico.Repositories;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using InventarioFisico.Models;
+using InventarioFisico.Repositories;
 
 namespace InventarioFisico.Services
 {
@@ -30,7 +31,6 @@ namespace InventarioFisico.Services
 
             foreach (var grupo in grupos)
             {
-                // 🔒 REGRA CLAVE: no recrear cabecera si ya existe
                 var existente = await _conteoRepo.ObtenerPorOperacionGrupoNumeroAsync(
                     operacionId,
                     grupo.Id,
@@ -50,34 +50,39 @@ namespace InventarioFisico.Services
 
                 await _conteoRepo.CrearAsync(conteo);
 
-                var ubicaciones = await _ubicacionService.ObtenerPorGrupoAsync(grupo.Id);
+                var items = await _ubicacionService.ObtenerAsync(grupo.Id);
+
                 var itemsAInsertar = new List<OperacionConteoItem>();
+                var clavesInsertadas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                foreach (var u in ubicaciones)
+                foreach (var it in items)
                 {
-                    var items = await _ubicacionService.ObtenerItemsPorUbicacionAsync(u.Ubicacion);
+                    var clave =
+                        $"{it.Item?.Trim().ToUpper()}|" +
+                        $"{it.Ubicacion?.Trim().ToUpper()}|" +
+                        $"{it.Lote?.Trim().ToUpper()}";
 
-                    foreach (var it in items)
+                    if (!clavesInsertadas.Add(clave))
+                        continue;
+
+                    itemsAInsertar.Add(new OperacionConteoItem
                     {
-                        itemsAInsertar.Add(new OperacionConteoItem
-                        {
-                            OperacionId = operacionId,
-                            GrupoId = grupo.Id,
-                            NumeroConteo = numeroConteo,
-                            CodigoItem = it.Item,
-                            Prod = it.Prod,
-                            Descripcion = it.Descripcion,
-                            Udm = it.Udm,
-                            Etiqueta = it.Etiqueta,
-                            Lote = it.Lote,
-                            Costo = it.Costo,
-                            CantidadSistema = it.CantidadSistema,
-                            CantidadContada = 0,
-                            Ubicacion = u.Ubicacion,
-                            Bodega = it.Bodega,
-                            Cmpy = it.Cmpy
-                        });
-                    }
+                        OperacionId = operacionId,
+                        GrupoId = grupo.Id,
+                        NumeroConteo = numeroConteo,
+                        CodigoItem = it.Item,
+                        Prod = it.Prod,
+                        Descripcion = it.Descripcion,
+                        Udm = it.Udm,
+                        Etiqueta = it.Etiqueta,
+                        Lote = it.Lote,
+                        Costo = it.Costo,
+                        CantidadSistema = it.CantidadSistema,
+                        CantidadContada = 0,
+                        Ubicacion = it.Ubicacion,
+                        Bodega = it.Bodega,
+                        Cmpy = it.Cmpy
+                    });
                 }
 
                 if (itemsAInsertar.Count > 0)

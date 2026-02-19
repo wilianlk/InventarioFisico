@@ -18,5 +18,6 @@
         public string Ubicacion { get; set; }
         public string Bodega { get; set; }
         public string Cmpy { get; set; }
+        public bool NoEncontrado { get; set; }
     }
 }

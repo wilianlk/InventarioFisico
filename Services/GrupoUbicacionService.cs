@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
-using IBM.Data.Db2;
 using InventarioFisico.Models;
 using InventarioFisico.Repositories;
 
@@ -16,89 +16,129 @@ namespace InventarioFisico.Services
             _repo = repo;
         }
 
-        public Task<List<GrupoUbicacion>> ObtenerPorGrupoAsync(int grupoId)
+        private static string N(string? s)
+            => string.IsNullOrWhiteSpace(s) ? "" : s.Trim().ToUpper();
+
+        private static string NormalizarBodega(string? bodega)
         {
-            return _repo.ObtenerPorGrupoAsync(grupoId);
+            var b = N(bodega);
+            if (b == "") throw new InvalidOperationException("Bodega obligatoria.");
+            return b;
         }
 
-        public async Task AgregarAsync(int grupoId, string ubicacion)
+        public async Task<List<ItemPhystag>> ObtenerAsync(int? grupoId)
         {
-            ubicacion = ubicacion.Trim().ToUpper();
+            var filtros = await _repo.ObtenerFiltrosAsync(grupoId);
+            var resultado = new List<ItemPhystag>();
 
-            var ubicacionesGrupo = await _repo.ObtenerUbicacionesPorGrupoAsync(grupoId);
-            if (ubicacionesGrupo.Exists(u => u.Trim().ToUpper() == ubicacion))
-                throw new InvalidOperationException(
-                    $"La ubicación {ubicacion} ya está asignada a este grupo."
+            foreach (var f in filtros.Where(x => !string.IsNullOrWhiteSpace(x.Ubicaciones)))
+            {
+                var items = await _repo.ObtenerItemsPorUbicacionExactaAsync(
+                    f.Bodega,
+                    f.Ubicaciones
                 );
 
-            var u = new GrupoUbicacion
-            {
-                GrupoId = grupoId,
-                Ubicacion = ubicacion
-            };
+                foreach (var item in items)
+                {
+                    item.GrupoId = f.GrupoId;
+                    item.GrupoNombre = f.GrupoNombre;
+                }
 
-            await _repo.AgregarAsync(u);
+                resultado.AddRange(items);
+            }
+
+            return resultado
+                .GroupBy(x => new { x.Bodega, x.Ubicacion, x.Item, x.Lote, x.GrupoId })
+                .Select(g => g.First())
+                .ToList();
         }
 
-        public async Task<List<string>> ObtenerRangoUbicacionesAsync(string desde, string hasta)
+        public async Task<List<ItemPhystag>> PrevisualizarAsync(
+            string? bodega,
+            string? rack,
+            string? lado,
+            string? altura,
+            string? ubicacion)
         {
-            return await _repo.ObtenerRangoUbicacionesAsync(
-                desde.Trim().ToUpper(),
-                hasta.Trim().ToUpper()
+            var b = NormalizarBodega(bodega);
+            var r = N(rack);
+            var l = b == "11" ? "" : N(lado);
+            var a = N(altura);
+            var u = N(ubicacion);
+
+            return await _repo.ObtenerItemsPorFiltroAsync(
+                b,
+                r,
+                l,
+                a,
+                u
             );
         }
 
-        public UbicacionInterpretada InterpretarUbicacion(string bodega, string ubicacion)
+        public async Task AgregarAsync(
+            int grupoId,
+            string? bodega,
+            List<GrupoUbicacion> ubicaciones)
         {
-            if (string.IsNullOrWhiteSpace(bodega))
-                throw new InvalidOperationException("La bodega es obligatoria para interpretar la ubicación.");
+            if (grupoId <= 0)
+                throw new InvalidOperationException("Grupo inválido.");
 
-            if (string.IsNullOrWhiteSpace(ubicacion))
-                throw new InvalidOperationException("La ubicación es obligatoria.");
+            var b = NormalizarBodega(bodega);
 
-            ubicacion = ubicacion.Trim().ToUpper();
+            if (ubicaciones == null || ubicaciones.Count == 0)
+                throw new InvalidOperationException("No hay ubicaciones para agregar.");
 
-            if (bodega == "13M")
+            foreach (var u in ubicaciones)
             {
-                return new UbicacionInterpretada
-                {
-                    Bodega = bodega,
-                    RackPasillo = ubicacion.Substring(0, 2),
-                    Lado = ubicacion.Substring(2, 1),
-                    Altura = ubicacion.Substring(3, 1),
-                    Posicion = ubicacion.Substring(4, 2)
-                };
-            }
+                if (!await _repo.ExisteEnInventarioAsync(b, u.Ubicaciones))
+                    throw new InvalidOperationException($"La ubicación {u.Ubicaciones} no existe en inventario.");
 
-            if (bodega == "11")
-            {
-                return new UbicacionInterpretada
+                await _repo.AgregarAsync(new GrupoUbicacion
                 {
-                    Bodega = bodega,
-                    RackPasillo = ubicacion.Substring(0, 1),
-                    Lado = null,
-                    Altura = ubicacion.Substring(1, 1),
-                    Posicion = ubicacion.Substring(2, 2)
-                };
+                    GrupoId = grupoId,
+                    Bodega = b,
+                    Ubicaciones = N(u.Ubicaciones),
+                    Rack = N(u.Rack),
+                    Lado = N(u.Lado),
+                    Altura = N(u.Altura),
+                    Ubicacion = N(u.Ubicacion)
+                });
             }
+        }
 
-            throw new InvalidOperationException(
-                $"No existe nomenclatura definida para la bodega {bodega}."
+        public async Task EliminarAsync(
+            int grupoId,
+            string? bodega,
+            string? rack,
+            string? lado,
+            string? altura,
+            string? ubicacion)
+        {
+            var b = NormalizarBodega(bodega);
+            var l = b == "11" ? "" : N(lado);
+
+            await _repo.EliminarAsync(
+                grupoId,
+                b,
+                N(rack),
+                l,
+                N(altura),
+                N(ubicacion)
             );
         }
 
-        public Task EliminarAsync(int grupoId, string ubicacion)
+        public async Task<List<object>> ObtenerBodegasAsync()
         {
-            return _repo.EliminarAsync(grupoId, ubicacion.Trim().ToUpper());
-        }
-    }
+            var data = await _repo.ObtenerBodegasAsync();
 
-    public class UbicacionInterpretada
-    {
-        public string Bodega { get; set; }
-        public string RackPasillo { get; set; }
-        public string Lado { get; set; }
-        public string Altura { get; set; }
-        public string Posicion { get; set; }
+            return data
+                .Select(x => new
+                {
+                    id = x.Id,
+                    descripcion = x.Descripcion
+                })
+                .Cast<object>()
+                .ToList();
+        }
     }
 }
