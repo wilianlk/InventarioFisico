@@ -10,23 +10,17 @@ namespace InventarioFisico.Services
     public class InventarioService
     {
         private readonly InventarioRepository _repo;
-        private readonly OperacionConteoRepository _conteoRepo;
-        private readonly OperacionConteoItemsRepository _itemsRepo;
         private readonly GrupoPersonaService _personaService;
         private readonly GrupoUbicacionService _ubicacionService;
         private readonly GrupoConteoService _grupoService;
 
         public InventarioService(
             InventarioRepository repo,
-            OperacionConteoRepository conteoRepo,
-            OperacionConteoItemsRepository itemsRepo,
             GrupoPersonaService personaService,
             GrupoUbicacionService ubicacionService,
             GrupoConteoService grupoService)
         {
             _repo = repo;
-            _conteoRepo = conteoRepo;
-            _itemsRepo = itemsRepo;
             _personaService = personaService;
             _ubicacionService = ubicacionService;
             _grupoService = grupoService;

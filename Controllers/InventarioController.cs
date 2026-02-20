@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using InventarioFisico.Services;
 using InventarioFisico.Repositories;
 using InventarioFisico.Models;
@@ -16,34 +15,28 @@ namespace InventarioFisico.Controllers
     {
         private readonly InventarioService _inventarioService;
         private readonly GrupoConteoService _grupoService;
-        private readonly BloqueConteoService _bloqueService;
         private readonly GeneradorConteoService _generadorConteoService;
         private readonly ValidacionCierreService _validacionCierreService;
         private readonly OperacionConteoRepository _conteoRepo;
         private readonly OperacionConteoItemsRepository _itemsRepo;
         private readonly CerrarConteoService _cerrarConteoService;
-        private readonly ILogger<InventarioController> _logger;
 
         public InventarioController(
             InventarioService inventarioService,
             GrupoConteoService grupoService,
-            BloqueConteoService bloqueService,
             GeneradorConteoService generadorConteoService,
             ValidacionCierreService validacionCierreService,
             OperacionConteoRepository conteoRepo,
             OperacionConteoItemsRepository itemsRepo,
-            CerrarConteoService cerrarConteoService,
-            ILogger<InventarioController> logger)
+            CerrarConteoService cerrarConteoService)
         {
             _inventarioService = inventarioService;
             _grupoService = grupoService;
-            _bloqueService = bloqueService;
             _generadorConteoService = generadorConteoService;
             _validacionCierreService = validacionCierreService;
             _conteoRepo = conteoRepo;
             _itemsRepo = itemsRepo;
             _cerrarConteoService = cerrarConteoService;
-            _logger = logger;
         }
 
         [HttpGet]
