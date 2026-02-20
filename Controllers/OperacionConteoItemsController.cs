@@ -80,25 +80,49 @@ namespace InventarioFisico.Controllers
             }
         }
 
-        [HttpPut("{itemId}/no-encontrado")]
-        public async Task<IActionResult> ActualizarNoEncontrado(int itemId, [FromBody] bool noEncontrado)
+        [HttpPut("no-encontrado")]
+        public async Task<IActionResult> ActualizarNoEncontrado([FromBody] ActualizarNoEncontradoRequest request)
         {
             try
             {
-                _logger.LogInformation("Actualizar NoEncontrado. ItemId={ItemId}, NoEncontrado={NoEncontrado}", itemId, noEncontrado);
-                await _itemsService.ActualizarNoEncontradoAsync(itemId, noEncontrado);
+                _logger.LogInformation("Actualizar NoEncontrado. ConteoId={ConteoId}, CodigoItem={CodigoItem}, NoEncontrado={NoEncontrado}", 
+                    request.ConteoId, request.CodigoItem, request.NoEncontrado);
+                await _itemsService.ActualizarNoEncontradoPorCodigoAsync(request.ConteoId, request.CodigoItem, request.NoEncontrado);
                 return Ok(new { mensaje = "Estado NoEncontrado actualizado correctamente." });
             }
             catch (KeyNotFoundException ex)
             {
-                _logger.LogWarning(ex, "Item no encontrado al actualizar NoEncontrado. ItemId={ItemId}", itemId);
+                _logger.LogWarning(ex, "Item no encontrado al actualizar NoEncontrado. CodigoItem={CodigoItem}", request.CodigoItem);
                 return NotFound(new { mensaje = ex.Message });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al actualizar NoEncontrado. ItemId={ItemId}", itemId);
+                _logger.LogError(ex, "Error al actualizar NoEncontrado. CodigoItem={CodigoItem}", request.CodigoItem);
                 return StatusCode(500, new { mensaje = "Error al actualizar NoEncontrado.", detalle = ex.Message });
             }
         }
+
+        [HttpPost("actualizar-conteo-id-faltantes")]
+        public async Task<IActionResult> ActualizarConteoIdFaltantes()
+        {
+            try
+            {
+                _logger.LogInformation("Actualizando ConteoId faltantes en items");
+                await _itemsService.ActualizarConteoIdFaltantesAsync();
+                return Ok(new { mensaje = "ConteoId actualizados correctamente." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al actualizar ConteoId faltantes");
+                return StatusCode(500, new { mensaje = "Error al actualizar ConteoId.", detalle = ex.Message });
+            }
+        }
+    }
+
+    public class ActualizarNoEncontradoRequest
+    {
+        public required int ConteoId { get; set; }
+        public required string CodigoItem { get; set; }
+        public required bool NoEncontrado { get; set; }
     }
 }

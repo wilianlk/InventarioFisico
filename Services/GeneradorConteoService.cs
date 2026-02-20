@@ -48,7 +48,7 @@ namespace InventarioFisico.Services
                     Estado = "ABIERTO"
                 };
 
-                await _conteoRepo.CrearAsync(conteo);
+                var conteoId = await _conteoRepo.CrearAsync(conteo);
 
                 var items = await _ubicacionService.ObtenerAsync(grupo.Id);
 
@@ -81,7 +81,8 @@ namespace InventarioFisico.Services
                         CantidadContada = 0,
                         Ubicacion = it.Ubicacion,
                         Bodega = it.Bodega,
-                        Cmpy = it.Cmpy
+                        Cmpy = it.Cmpy,
+                        ConteoId = conteoId
                     });
                 }
 

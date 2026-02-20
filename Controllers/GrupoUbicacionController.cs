@@ -103,32 +103,39 @@ namespace InventarioFisico.Controllers
         [HttpPost("agregar")]
         public async Task<IActionResult> Agregar([FromBody] GrupoUbicacionAgregarDto req)
         {
-            var grupo = await _grupoService.ObtenerPorIdAsync(req.GrupoId);
-            if (grupo == null)
-                return NotFound(new { mensaje = "Grupo no encontrado." });
-
-            if (grupo.Estado != "ACTIVO")
-                return Conflict(new { mensaje = "No se pueden modificar ubicaciones: el grupo est\u00e1 INACTIVO." });
-
-            var lista = new List<GrupoUbicacion>();
-
-            foreach (var u in req.Ubicaciones)
+            try
             {
-                lista.Add(new GrupoUbicacion
+                var grupo = await _grupoService.ObtenerPorIdAsync(req.GrupoId);
+                if (grupo == null)
+                    return NotFound(new { mensaje = "Grupo no encontrado." });
+
+                if (grupo.Estado != "ACTIVO")
+                    return Conflict(new { mensaje = "No se pueden modificar ubicaciones: el grupo est\u00e1 INACTIVO." });
+
+                var lista = new List<GrupoUbicacion>();
+
+                foreach (var u in req.Ubicaciones)
                 {
-                    GrupoId = req.GrupoId,
-                    Bodega = req.Bodega,
-                    Ubicaciones = u.Ubicacion,
-                    Rack = u.Rack,
-                    Lado = u.Lado,
-                    Altura = u.Altura,
-                    Ubicacion = u.Posicion
-                });
+                    lista.Add(new GrupoUbicacion
+                    {
+                        GrupoId = req.GrupoId,
+                        Bodega = req.Bodega,
+                        Ubicaciones = u.Ubicacion,
+                        Rack = u.Rack,
+                        Lado = u.Lado,
+                        Altura = u.Altura,
+                        Ubicacion = u.Posicion
+                    });
+                }
+
+                await _service.AgregarAsync(req.GrupoId, req.Bodega, lista);
+
+                return Ok(new { mensaje = "Ubicaciones agregadas correctamente." });
             }
-
-            await _service.AgregarAsync(req.GrupoId, req.Bodega, lista);
-
-            return Ok(new { mensaje = "Ubicaciones agregadas correctamente." });
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { mensaje = ex.Message });
+            }
         }
 
         [HttpDelete("eliminar")]

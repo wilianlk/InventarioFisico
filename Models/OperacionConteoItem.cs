@@ -19,5 +19,6 @@
         public string Bodega { get; set; }
         public string Cmpy { get; set; }
         public bool NoEncontrado { get; set; }
+        public int? ConteoId { get; set; } // Nueva propiedad para oc_id
     }
 }

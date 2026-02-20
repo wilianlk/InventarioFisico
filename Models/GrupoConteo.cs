@@ -9,5 +9,7 @@ namespace InventarioFisico.Models
         public string Estado { get; set; }
         public string FechaCreacion { get; set; }
         public int UsuarioCreacion { get; set; }
+        public bool TieneConteoAbierto { get; set; }
+        public int? OperacionIdConteoAbierto { get; set; }
     }
 }

@@ -116,21 +116,30 @@ namespace InventarioFisico.Repositories
 
             if (rack != "")
                 sql += bodega == "11"
-                    ? " AND SUBSTR(p.tg_bin,1,1) = ?"
-                    : " AND SUBSTR(p.tg_bin,1,2) = ?";
+                    ? " AND UPPER(SUBSTR(TRIM(p.tg_bin),1,1)) = UPPER(?)"
+                    : " AND UPPER(SUBSTR(p.tg_bin,1,2)) = UPPER(?)";
 
             if (bodega == "13M" && lado != "")
-                sql += " AND SUBSTR(p.tg_bin,3,1) = ?";
+                sql += " AND UPPER(SUBSTR(p.tg_bin,3,1)) = UPPER(?)";
 
             if (altura != "")
                 sql += bodega == "11"
-                    ? " AND SUBSTR(p.tg_bin,2,1) = ?"
-                    : " AND SUBSTR(p.tg_bin,4,1) = ?";
+                    ? " AND UPPER(SUBSTR(TRIM(p.tg_bin),2,1)) = UPPER(?)"
+                    : " AND UPPER(SUBSTR(p.tg_bin,4,1)) = UPPER(?)";
 
             if (ubicacion != "")
-                sql += bodega == "11"
-                    ? " AND SUBSTR(p.tg_bin,3,2) = ?"
-                    : " AND SUBSTR(p.tg_bin,5,2) = ?";
+            {
+                if (bodega == "11")
+                {
+                    sql += ubicacion.Length == 2
+                        ? " AND (UPPER(RIGHT(TRIM(p.tg_bin),2)) = UPPER(?) OR UPPER(RIGHT(TRIM(p.tg_bin),3)) = UPPER(?))"
+                        : " AND UPPER(RIGHT(TRIM(p.tg_bin),3)) = UPPER(?)";
+                }
+                else
+                {
+                    sql += " AND UPPER(SUBSTR(p.tg_bin,5,2)) = UPPER(?)";
+                }
+            }
 
             using var cmd = new DB2Command(sql, conn);
             cmd.Parameters.Add(new DB2Parameter("bodega", bodega));
@@ -138,7 +147,25 @@ namespace InventarioFisico.Repositories
             if (rack != "") cmd.Parameters.Add(new DB2Parameter("rack", rack));
             if (bodega == "13M" && lado != "") cmd.Parameters.Add(new DB2Parameter("lado", lado));
             if (altura != "") cmd.Parameters.Add(new DB2Parameter("altura", altura));
-            if (ubicacion != "") cmd.Parameters.Add(new DB2Parameter("ubicacion", ubicacion));
+            if (ubicacion != "")
+            {
+                if (bodega == "11")
+                {
+                    if (ubicacion.Length == 2)
+                    {
+                        cmd.Parameters.Add(new DB2Parameter("ubicacion2", ubicacion));
+                        cmd.Parameters.Add(new DB2Parameter("ubicacion3", ubicacion.PadLeft(3, '0')));
+                    }
+                    else
+                    {
+                        cmd.Parameters.Add(new DB2Parameter("ubicacion3", ubicacion));
+                    }
+                }
+                else
+                {
+                    cmd.Parameters.Add(new DB2Parameter("ubicacion", ubicacion));
+                }
+            }
 
             var lista = new List<ItemPhystag>();
 
@@ -268,6 +295,42 @@ namespace InventarioFisico.Repositories
             return await cmd.ExecuteScalarAsync() != null;
         }
 
+        public async Task<bool> ExisteFiltroAsync(
+            int grupoId,
+            string bodega,
+            string ubicaciones,
+            string rack,
+            string lado,
+            string altura,
+            string posicion)
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            const string sql = @"
+                SELECT FIRST 1 1
+                FROM grupo_ubicacion
+                WHERE gu_grupo_id = ?
+                  AND gu_bodega = ?
+                  AND gu_ubicacion = ?
+                  AND COALESCE(gu_rack, '') = ?
+                  AND COALESCE(gu_lado, '') = ?
+                  AND COALESCE(gu_altura, '') = ?
+                  AND COALESCE(gu_posicion, '') = ?
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter("grupo", grupoId));
+            cmd.Parameters.Add(new DB2Parameter("bodega", bodega));
+            cmd.Parameters.Add(new DB2Parameter("ubicaciones", ubicaciones));
+            cmd.Parameters.Add(new DB2Parameter("rack", rack));
+            cmd.Parameters.Add(new DB2Parameter("lado", lado));
+            cmd.Parameters.Add(new DB2Parameter("altura", altura));
+            cmd.Parameters.Add(new DB2Parameter("posicion", posicion));
+
+            return await cmd.ExecuteScalarAsync() != null;
+        }
+
         public async Task<List<(string Id, string Descripcion)>> ObtenerBodegasAsync()
         {
             using var conn = new DB2Connection(_provider.Get());
@@ -277,7 +340,7 @@ namespace InventarioFisico.Repositories
                 SELECT war_id, war_desc
                 FROM warehous
                 WHERE war_cmpy = 'RE'
-                  AND war_id IN ('11','13M')
+                  AND war_id IN ('11','13M','56','40','13','68','13A','A','69')
                 ORDER BY war_id
             ";
 

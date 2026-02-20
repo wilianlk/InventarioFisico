@@ -108,16 +108,44 @@ namespace InventarioFisico.Repositories
             await conn.OpenAsync();
 
             const string sql = @"
-                SELECT gc_id, gc_nombre, gc_estado, gc_fecha_creacion, gc_usuario_creacion
-                FROM grupo_conteo
-                WHERE gc_estado = 'ACTIVO'";
+                SELECT
+                    gc.gc_id,
+                    gc.gc_nombre,
+                    gc.gc_estado,
+                    gc.gc_fecha_creacion,
+                    gc.gc_usuario_creacion,
+                    CASE
+                        WHEN ocab.operacion_id IS NULL THEN 0
+                        ELSE 1
+                    END AS tiene_conteo_abierto,
+                    ocab.operacion_id AS operacion_id_conteo_abierto
+                FROM grupo_conteo gc
+                LEFT JOIN (
+                    SELECT
+                        oc.grupo_id,
+                        MIN(oc.operacion_id) AS operacion_id
+                    FROM operacion_conteo oc
+                    WHERE oc.estado = 'ABIERTO'
+                    GROUP BY oc.grupo_id
+                ) ocab
+                    ON ocab.grupo_id = gc.gc_id
+                WHERE gc.gc_estado = 'ACTIVO'";
 
             using var cmd = new DB2Command(sql, conn);
             using DbDataReader r = await cmd.ExecuteReaderAsync();
 
             while (await r.ReadAsync())
             {
-                lista.Add(Map(r));
+                lista.Add(new GrupoConteo
+                {
+                    Id = r.GetInt32(0),
+                    Nombre = r.GetString(1).Trim(),
+                    Estado = r.GetString(2).Trim(),
+                    FechaCreacion = r.GetString(3),
+                    UsuarioCreacion = r.GetInt32(4),
+                    TieneConteoAbierto = r.GetInt32(5) == 1,
+                    OperacionIdConteoAbierto = r.IsDBNull(6) ? null : r.GetInt32(6)
+                });
             }
 
             return lista;

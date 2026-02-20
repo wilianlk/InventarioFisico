@@ -90,18 +90,27 @@ namespace InventarioFisico.Services
 
             foreach (var u in ubicaciones)
             {
-                if (!await _repo.ExisteEnInventarioAsync(b, u.Ubicaciones))
-                    throw new InvalidOperationException($"La ubicación {u.Ubicaciones} no existe en inventario.");
+                var ubicacion = N(u.Ubicaciones);
+                var rack = N(u.Rack);
+                var lado = N(u.Lado);
+                var altura = N(u.Altura);
+                var posicion = N(u.Ubicacion);
+
+                if (!await _repo.ExisteEnInventarioAsync(b, ubicacion))
+                    throw new InvalidOperationException($"La ubicación {ubicacion} no existe en inventario.");
+
+                if (await _repo.ExisteFiltroAsync(grupoId, b, ubicacion, rack, lado, altura, posicion))
+                    throw new InvalidOperationException($"La ubicación {ubicacion} ya está asignada al grupo en la bodega {b}.");
 
                 await _repo.AgregarAsync(new GrupoUbicacion
                 {
                     GrupoId = grupoId,
                     Bodega = b,
-                    Ubicaciones = N(u.Ubicaciones),
-                    Rack = N(u.Rack),
-                    Lado = N(u.Lado),
-                    Altura = N(u.Altura),
-                    Ubicacion = N(u.Ubicacion)
+                    Ubicaciones = ubicacion,
+                    Rack = rack,
+                    Lado = lado,
+                    Altura = altura,
+                    Ubicacion = posicion
                 });
             }
         }

@@ -50,5 +50,17 @@ namespace InventarioFisico.Services
 
             await _repo.ActualizarNoEncontradoAsync(itemId, noEncontrado);
         }
+
+        public async Task ActualizarNoEncontradoPorCodigoAsync(int conteoId, string codigoItem, bool noEncontrado)
+        {
+            var afectados = await _repo.ActualizarNoEncontradoPorCodigoAsync(conteoId, codigoItem, noEncontrado);
+            if (afectados == 0)
+                throw new KeyNotFoundException("Ítem no encontrado en el conteo especificado.");
+        }
+
+        public async Task ActualizarConteoIdFaltantesAsync()
+        {
+            await _repo.ActualizarConteoIdFaltantesAsync();
+        }
     }
 }

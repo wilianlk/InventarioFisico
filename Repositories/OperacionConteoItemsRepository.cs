@@ -32,13 +32,13 @@ namespace InventarioFisico.Repositories
                     INSERT INTO operacion_conteo_items
                     (operacion_id,grupo_id,numero_conteo,codigo_item,prod,descripcion,udm,
                      etiqueta,lote,costo,cantidad_sistema,cantidad_contada,
-                     ubicacion,bodega,cmpy,no_encontrado)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                     ubicacion,bodega,cmpy,no_encontrado,oc_id)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ";
 
                 using var cmd = new DB2Command(sql, conn, tx);
 
-                for (int i = 0; i < 16; i++) cmd.Parameters.Add(new DB2Parameter());
+                for (int i = 0; i < 17; i++) cmd.Parameters.Add(new DB2Parameter());
 
                 foreach (var it in items)
                 {
@@ -58,6 +58,7 @@ namespace InventarioFisico.Repositories
                     cmd.Parameters[13].Value = (object?)it.Bodega ?? DBNull.Value;
                     cmd.Parameters[14].Value = (object?)it.Cmpy ?? DBNull.Value;
                     cmd.Parameters[15].Value = it.NoEncontrado ? 1 : 0;
+                    cmd.Parameters[16].Value = (object?)it.ConteoId ?? DBNull.Value;
 
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -80,7 +81,7 @@ namespace InventarioFisico.Repositories
                 SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
                        descripcion,udm,etiqueta,lote,costo,
                        cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
-                       no_encontrado
+                       no_encontrado,oc_id
                 FROM operacion_conteo_items
                 WHERE id=?
             ";
@@ -105,7 +106,7 @@ namespace InventarioFisico.Repositories
                 SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
                        descripcion,udm,etiqueta,lote,costo,
                        cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
-                       no_encontrado
+                       no_encontrado,oc_id
                 FROM operacion_conteo_items
                 WHERE operacion_id=?
                   AND grupo_id=?
@@ -137,7 +138,7 @@ namespace InventarioFisico.Repositories
                 SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
                        descripcion,udm,etiqueta,lote,costo,
                        cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
-                       no_encontrado
+                       no_encontrado,oc_id
                 FROM operacion_conteo_items
                 WHERE oc_id=?
             ";
@@ -165,7 +166,7 @@ namespace InventarioFisico.Repositories
                 SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
                        descripcion,udm,etiqueta,lote,costo,
                        cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
-                       no_encontrado
+                       no_encontrado,oc_id
                 FROM operacion_conteo_items
                 WHERE oc_id=?
                   AND no_encontrado=1
@@ -194,7 +195,7 @@ namespace InventarioFisico.Repositories
                 SELECT id,operacion_id,grupo_id,numero_conteo,codigo_item,prod,
                        descripcion,udm,etiqueta,lote,costo,
                        cantidad_sistema,cantidad_contada,ubicacion,bodega,cmpy,
-                       no_encontrado
+                       no_encontrado,oc_id
                 FROM operacion_conteo_items
                 WHERE operacion_id=?
             ";
@@ -263,6 +264,48 @@ namespace InventarioFisico.Repositories
             await cmd.ExecuteNonQueryAsync();
         }
 
+        public async Task<int> ActualizarNoEncontradoPorCodigoAsync(int conteoId, string codigoItem, bool noEncontrado)
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                UPDATE operacion_conteo_items
+                SET no_encontrado=?
+                WHERE oc_id=?
+                  AND TRIM(codigo_item)=TRIM(?)
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter { Value = noEncontrado ? 1 : 0 });
+            cmd.Parameters.Add(new DB2Parameter { Value = conteoId });
+            cmd.Parameters.Add(new DB2Parameter { Value = codigoItem });
+
+            return await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task ActualizarConteoIdFaltantesAsync()
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                UPDATE operacion_conteo_items oci
+                SET oc_id = (
+                    SELECT oc.id
+                    FROM operacion_conteo oc
+                    WHERE oc.operacion_id = oci.operacion_id
+                      AND oc.grupo_id = oci.grupo_id
+                      AND oc.numero_conteo = oci.numero_conteo
+                    FIRST 1
+                )
+                WHERE oci.oc_id IS NULL
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         private static OperacionConteoItem Map(DbDataReader r)
         {
             return new OperacionConteoItem
@@ -283,7 +326,8 @@ namespace InventarioFisico.Repositories
                 Ubicacion = r.IsDBNull(13) ? "" : r.GetString(13),
                 Bodega = r.IsDBNull(14) ? null : r.GetString(14),
                 Cmpy = r.IsDBNull(15) ? null : r.GetString(15),
-                NoEncontrado = !r.IsDBNull(16) && r.GetInt16(16) == 1
+                NoEncontrado = !r.IsDBNull(16) && r.GetInt16(16) == 1,
+                ConteoId = r.IsDBNull(17) ? null : r.GetInt32(17)
             };
         }
     }
