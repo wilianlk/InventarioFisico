@@ -114,21 +114,9 @@ namespace InventarioFisico.Repositories
                     gc.gc_estado,
                     gc.gc_fecha_creacion,
                     gc.gc_usuario_creacion,
-                    CASE
-                        WHEN ocab.operacion_id IS NULL THEN 0
-                        ELSE 1
-                    END AS tiene_conteo_abierto,
-                    ocab.operacion_id AS operacion_id_conteo_abierto
+                    0 AS tiene_conteo_abierto,
+                    CAST(NULL AS INTEGER) AS operacion_id_conteo_abierto
                 FROM grupo_conteo gc
-                LEFT JOIN (
-                    SELECT
-                        oc.grupo_id,
-                        MIN(oc.operacion_id) AS operacion_id
-                    FROM operacion_conteo oc
-                    WHERE oc.estado = 'ABIERTO'
-                    GROUP BY oc.grupo_id
-                ) ocab
-                    ON ocab.grupo_id = gc.gc_id
                 WHERE gc.gc_estado = 'ACTIVO'";
 
             using var cmd = new DB2Command(sql, conn);

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using InventarioFisico.Models;
 using InventarioFisico.Services;
 using System;
 using System.Collections.Generic;
@@ -119,10 +120,4 @@ namespace InventarioFisico.Controllers
         }
     }
 
-    public class ActualizarNoEncontradoRequest
-    {
-        public required int ConteoId { get; set; }
-        public required string CodigoItem { get; set; }
-        public required bool NoEncontrado { get; set; }
-    }
 }

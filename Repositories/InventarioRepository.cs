@@ -23,7 +23,8 @@ namespace InventarioFisico.Repositories
             await conn.OpenAsync();
 
             var sql = @"SELECT id,bodega,fecha,observaciones,estado,usuario_creacion,fecha_creacion,numero_conteo
-                        FROM operaciones_inventario";
+                        FROM operaciones_inventario
+                        ORDER BY id DESC";
 
             using var cmd = new DB2Command(sql, conn);
             using var reader = await cmd.ExecuteReaderAsync();
@@ -110,6 +111,19 @@ namespace InventarioFisico.Repositories
             var sql = "UPDATE operaciones_inventario SET estado = ? WHERE id = ?";
             using var cmd = new DB2Command(sql, conn);
             cmd.Parameters.Add(new DB2Parameter("estado", nuevoEstado));
+            cmd.Parameters.Add(new DB2Parameter("id", id));
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task ActualizarNumeroConteoAsync(int id, int numeroConteo)
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = "UPDATE operaciones_inventario SET numero_conteo = ? WHERE id = ?";
+            using var cmd = new DB2Command(sql, conn);
+            cmd.Parameters.Add(new DB2Parameter("numero_conteo", numeroConteo));
             cmd.Parameters.Add(new DB2Parameter("id", id));
 
             await cmd.ExecuteNonQueryAsync();

@@ -5,6 +5,8 @@ namespace InventarioFisico.Models
     public class ConsolidadoRowTemp
     {
         public int OperacionId { get; set; }
+        public string EstadoOperacion { get; set; } = string.Empty;
+        public int NumeroConteo { get; set; }
 
         public HashSet<int> Bloques { get; set; } = new();
 
@@ -24,6 +26,8 @@ namespace InventarioFisico.Models
         public decimal? Conteo1 { get; set; }
         public decimal? Conteo2 { get; set; }
         public decimal? Conteo3 { get; set; }
+
+        public Dictionary<int, ConteoValorDto> ConteosPorNumero { get; set; } = new();
 
         public string GrupoConteo1 { get; set; }
         public string GrupoConteo2 { get; set; }

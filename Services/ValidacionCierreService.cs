@@ -25,7 +25,7 @@ namespace InventarioFisico.Services
 
             if (conteos.Any(c => c.Estado != "CERRADO"))
                 throw new System.InvalidOperationException(
-                    "No se puede cerrar la operación: existen conteos abiertos."
+                    "No se puede cerrar la operación: existen conteos en curso."
                 );
         }
     }

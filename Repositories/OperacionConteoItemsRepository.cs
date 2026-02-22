@@ -212,6 +212,68 @@ namespace InventarioFisico.Repositories
             return lista;
         }
 
+        public async Task<Dictionary<int, (int TotalItems, int ItemsContados)>> ObtenerAvancePorOperacionAsync()
+        {
+            var resultado = new Dictionary<int, (int TotalItems, int ItemsContados)>();
+
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                SELECT operacion_id,
+                       COUNT(*) AS total_items,
+                       SUM(CASE WHEN cantidad_contada > 0 THEN 1 ELSE 0 END) AS items_contados
+                FROM operacion_conteo_items
+                GROUP BY operacion_id
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            using DbDataReader r = await cmd.ExecuteReaderAsync();
+
+            while (await r.ReadAsync())
+            {
+                var operacionId = r.GetInt32(0);
+                var totalItems = r.IsDBNull(1) ? 0 : Convert.ToInt32(r.GetValue(1));
+                var itemsContados = r.IsDBNull(2) ? 0 : Convert.ToInt32(r.GetValue(2));
+
+                resultado[operacionId] = (totalItems, itemsContados);
+            }
+
+            return resultado;
+        }
+
+        public async Task<Dictionary<int, (int TotalItems, int ItemsContados)>> ObtenerAvancePorConteoAsync()
+        {
+            var resultado = new Dictionary<int, (int TotalItems, int ItemsContados)>();
+
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            var sql = @"
+                SELECT oc.id AS conteo_id,
+                       COUNT(oci.id) AS total_items,
+                       SUM(CASE WHEN oci.cantidad_contada > 0 THEN 1 ELSE 0 END) AS items_contados
+                FROM operacion_conteo oc
+                LEFT JOIN operacion_conteo_items oci
+                  ON oci.oc_id = oc.id
+                GROUP BY oc.id
+            ";
+
+            using var cmd = new DB2Command(sql, conn);
+            using DbDataReader r = await cmd.ExecuteReaderAsync();
+
+            while (await r.ReadAsync())
+            {
+                var conteoId = r.GetInt32(0);
+                var totalItems = r.IsDBNull(1) ? 0 : Convert.ToInt32(r.GetValue(1));
+                var itemsContados = r.IsDBNull(2) ? 0 : Convert.ToInt32(r.GetValue(2));
+
+                resultado[conteoId] = (totalItems, itemsContados);
+            }
+
+            return resultado;
+        }
+
         public async Task EliminarPorOperacionAsync(int operacionId)
         {
             using var conn = new DB2Connection(_provider.Get());

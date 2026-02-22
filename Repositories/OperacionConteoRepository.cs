@@ -197,7 +197,7 @@ namespace InventarioFisico.Repositories
                 FROM operacion_conteo oc
                 LEFT JOIN grupo_conteo gc
                     ON gc.gc_id = oc.grupo_id
-                WHERE oc.estado = 'ABIERTO'
+                WHERE oc.estado = 'EN_CONTEO'
                 ORDER BY oc.fecha_creacion
             ";
 
@@ -238,7 +238,7 @@ namespace InventarioFisico.Repositories
                     ON gc.gc_id = oc.grupo_id
                 WHERE oc.operacion_id = ?
                   AND oc.grupo_id = ?
-                  AND oc.estado = 'ABIERTO'
+                  AND oc.estado = 'EN_CONTEO'
                 ORDER BY oc.fecha_creacion
                 FIRST 1
             ";
@@ -294,6 +294,80 @@ namespace InventarioFisico.Repositories
             using var cmd = new DB2Command(sql, conn);
             cmd.Parameters.Add(new DB2Parameter { Value = operacionId });
             await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task EliminarConteoAsync(int conteoId, int operacionId, int grupoId, int numeroConteo)
+        {
+            using var conn = new DB2Connection(_provider.Get());
+            await conn.OpenAsync();
+
+            using var tx = conn.BeginTransaction();
+
+            try
+            {
+                var sqlDetalle = @"
+                    DELETE FROM consolidacion_detalle
+                    WHERE cabecera_id IN (
+                        SELECT id
+                        FROM consolidacion_cabecera
+                        WHERE operacion_id = ?
+                          AND grupo_id = ?
+                          AND numero_conteo = ?
+                    )
+                ";
+
+                using (var cmd = new DB2Command(sqlDetalle, conn, tx))
+                {
+                    cmd.Parameters.Add(new DB2Parameter { Value = operacionId });
+                    cmd.Parameters.Add(new DB2Parameter { Value = grupoId });
+                    cmd.Parameters.Add(new DB2Parameter { Value = numeroConteo });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                var sqlCabecera = @"
+                    DELETE FROM consolidacion_cabecera
+                    WHERE operacion_id = ?
+                      AND grupo_id = ?
+                      AND numero_conteo = ?
+                ";
+
+                using (var cmd = new DB2Command(sqlCabecera, conn, tx))
+                {
+                    cmd.Parameters.Add(new DB2Parameter { Value = operacionId });
+                    cmd.Parameters.Add(new DB2Parameter { Value = grupoId });
+                    cmd.Parameters.Add(new DB2Parameter { Value = numeroConteo });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                var sqlItems = @"
+                    DELETE FROM operacion_conteo_items
+                    WHERE oc_id = ?
+                       OR (operacion_id = ? AND grupo_id = ? AND numero_conteo = ?)
+                ";
+
+                using (var cmd = new DB2Command(sqlItems, conn, tx))
+                {
+                    cmd.Parameters.Add(new DB2Parameter { Value = conteoId });
+                    cmd.Parameters.Add(new DB2Parameter { Value = operacionId });
+                    cmd.Parameters.Add(new DB2Parameter { Value = grupoId });
+                    cmd.Parameters.Add(new DB2Parameter { Value = numeroConteo });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                var sqlConteo = "DELETE FROM operacion_conteo WHERE id = ?";
+                using (var cmd = new DB2Command(sqlConteo, conn, tx))
+                {
+                    cmd.Parameters.Add(new DB2Parameter { Value = conteoId });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                try { tx.Rollback(); } catch { }
+                throw;
+            }
         }
     }
 }

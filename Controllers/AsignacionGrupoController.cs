@@ -1,15 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using InventarioFisico.Models;
 using InventarioFisico.Services;
 
 namespace InventarioFisico.Controllers
 {
-    public class AsignacionGrupoRequest
-    {
-        public int OperacionId { get; set; }
-        public int GrupoId { get; set; }
-    }
-
     [ApiController]
     [Route("api/[controller]")]
     public class AsignacionGrupoController : ControllerBase

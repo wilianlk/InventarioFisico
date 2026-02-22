@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -81,10 +81,30 @@ namespace InventarioFisico.Services
             if (operacion == null)
                 throw new InvalidOperationException("La operación no existe.");
 
-            if (operacion.Estado == "CERRADA")
+            if (operacion.Estado == "ELIMINADA")
+                throw new InvalidOperationException("No se puede cerrar una operaci�n eliminada.");
+
+            if (operacion.Estado == "CERRADA" || operacion.Estado == "CONSOLIDADA" || operacion.Estado == "FINALIZADA")
                 return;
 
             await _repo.ActualizarEstadoAsync(id, "CERRADA");
+        }
+
+        public async Task<(int NumeroAnterior, int NumeroNuevo)> ActualizarNumeroConteoAsync(int id, int numeroConteo)
+        {
+            var operacion = await _repo.ObtenerOperacionPorIdAsync(id);
+            if (operacion == null)
+                throw new InvalidOperationException("La operación no existe.");
+
+            if (operacion.Estado == "CERRADA" || operacion.Estado == "CONSOLIDADA" || operacion.Estado == "FINALIZADA" || operacion.Estado == "ELIMINADA")
+                throw new InvalidOperationException("No se puede editar una operacion cerrada, consolidada, finalizada o eliminada.");
+
+            if (numeroConteo < 1 || numeroConteo > 3)
+                throw new InvalidOperationException("El número de conteo debe estar entre 1 y 3.");
+
+
+            await _repo.ActualizarNumeroConteoAsync(id, numeroConteo);
+            return (operacion.NumeroConteo, numeroConteo);
         }
 
         public async Task EliminarOperacionAsync(int id)
@@ -92,9 +112,6 @@ namespace InventarioFisico.Services
             var operacion = await _repo.ObtenerOperacionPorIdAsync(id);
             if (operacion == null)
                 throw new InvalidOperationException("La operación no existe.");
-
-            if (operacion.Estado != "EN_PREPARACION")
-                throw new InvalidOperationException("Solo pueden eliminarse operaciones en estado EN_PREPARACION.");
 
             await _repo.EliminarOperacionAsync(id);
         }
@@ -106,3 +123,7 @@ namespace InventarioFisico.Services
         }
     }
 }
+
+
+
+

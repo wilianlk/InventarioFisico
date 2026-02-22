@@ -14,6 +14,9 @@ namespace InventarioFisico.Models
         public DateTime FechaCreacion { get; set; }
         public int NumeroConteo { get; set; }
         public List<int> GruposIds { get; set; }
+        public int TotalItems { get; set; }
+        public int ItemsContados { get; set; }
+        public int Porcentaje { get; set; }
 
         public InventarioOperacion()
         {

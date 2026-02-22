@@ -45,7 +45,7 @@ namespace InventarioFisico.Services
                     OperacionId = operacionId,
                     GrupoId = grupo.Id,
                     NumeroConteo = numeroConteo,
-                    Estado = "ABIERTO"
+                    Estado = "EN_CONTEO"
                 };
 
                 var conteoId = await _conteoRepo.CrearAsync(conteo);

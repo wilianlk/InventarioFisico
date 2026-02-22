@@ -20,13 +20,6 @@ namespace InventarioFisico.Controllers
             _grupoService = grupoService;
         }
 
-        public class GrupoUbicacionAgregarDto
-        {
-            [Required] public int GrupoId { get; set; }
-            [Required] public string Bodega { get; set; } = "";
-            [Required] public List<GrupoUbicacionItemDto> Ubicaciones { get; set; } = new();
-        }
-
         [HttpGet]
         public async Task<IActionResult> Obtener([FromQuery] int? grupoId)
         {
